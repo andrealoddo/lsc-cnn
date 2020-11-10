@@ -1,0 +1,16 @@
+ShanghaiTech Part A
+
+cp -r parta/models .
+python3 main.py --dataset="parta" --gpu=0 --start-epoch=13 --epochs=13 --threshold=0.21
+
+
+ShanghaiTech Part B
+
+cp -r partb/models .
+python3 main.py --dataset="partb" --gpu=0 --start-epoch=24 --epochs=24 --threshold=0.25
+
+
+QNRF
+cp -r qnrf/models .
+python3 main.py --dataset="ucfqnrf" --gpu=0 --start-epoch=46 --epochs=46 --threshold=0.20
+nohup ./test-qnrf.sh > nohup/test-qnrf.out &

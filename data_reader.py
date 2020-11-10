@@ -27,7 +27,7 @@ class DataReader:
         training: extract random crops with flip augmentation.
     """
 
-    def __init__(self, temporary_data_path):
+    def __init__(self, temporary_data_path, dataset_name):
         """
         Initiate the data_reader class
 
@@ -37,6 +37,7 @@ class DataReader:
             Path to store processed dataset data.
         """
         self.dataset_ready = False
+        self.dataset_name = dataset_name
         try:
             with open(os.path.join(temporary_data_path,
                                    'meta_data.save'), 'rb') as fp:
@@ -729,7 +730,7 @@ class DataReader:
                     zip(roi_slice_batch, roi_relative_slice_batch, *results):
                 roi_slice, roi_rel_slice = batch_item[: 2]
                 pred_maps = batch_item[2: ] # same size as `gt_batch`
-                
+
                 for (pmap_full_size, pred_map) in zip(predicted_maps_full_size,
                                                     pred_maps):
                     pmap_full_size[:, roi_slice[0]: roi_slice[1],
@@ -785,9 +786,14 @@ class DataReader:
         if self.gt_roi_readout_function is None:
             # ASSUMES: ST PartA Dataset
             tmp, _ = os.path.splitext(file_name)
-            data_mat = scipy.io.loadmat(os.path.join(paths[1],
+            if(self.dataset_name == 'parta' or self.dataset_name == 'partb'):
+                data_mat = scipy.io.loadmat(os.path.join(paths[1],
                                                      'GT_' + tmp + '.mat'))
-            gt_annotation_points = data_mat['image_info'][0, 0]['location'][0, 0]
+                gt_annotation_points = data_mat['image_info'][0, 0]['location'][0, 0]
+            elif(self.dataset_name == 'ucfqnrf'):
+                data_mat = scipy.io.loadmat(os.path.join(paths[1], tmp + '_ann.mat'))
+                gt_annotation_points = data_mat['annPoints']
+
             gt_annotation_points -= 1  # MATLAB INDICES
             gt_roi_map = None
         else:
@@ -895,4 +901,3 @@ class DataReader:
         fig.clf()
         plt.clf()
         plt.close()
-

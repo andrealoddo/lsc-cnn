@@ -1,5 +1,5 @@
 """
-main.py: Main code to drive LSC-CNN 
+main.py: Main code to drive LSC-CNN
 Authors       : svp, mns, dbs
 """
 
@@ -28,10 +28,10 @@ from utils.loss_weights import *
 
 
 ################ Architecture Hyper-parameters ################
-# PRED_DOWNSCALE_FACTORS is the set of integer factors indicating how much to 
-# downscale the dimensions of the ground truth prediction for each scale output. 
-# Note that the data reader under default settings creates prediction maps at 
-# one-half resolution (wrt input sizes) and hence PRED_DOWNSCALE_FACTORS = 
+# PRED_DOWNSCALE_FACTORS is the set of integer factors indicating how much to
+# downscale the dimensions of the ground truth prediction for each scale output.
+# Note that the data reader under default settings creates prediction maps at
+# one-half resolution (wrt input sizes) and hence PRED_DOWNSCALE_FACTORS =
 # (8, 4, 2, 1) translates to 1/16, 1/8, 1/4 and 1/2 prediction sizes (s={0,1,2,3}).
 PRED_DOWNSCALE_FACTORS = (8, 4, 2, 1)
 
@@ -72,17 +72,17 @@ parser.add_argument('--epochs', default=200, type=int, metavar='N',
                     help='number of total epochs to run')
 parser.add_argument('--gpu', default=1, type=int,
                     help='GPU number')
-parser.add_argument('--start-epoch', default=0, type=int, metavar='N', 
+parser.add_argument('--start-epoch', default=0, type=int, metavar='N',
                     help='manual epoch number (useful on restarts),\
                     0-indexed - so equal to the number of epochs completed \
                     in the last save-file')
 parser.add_argument('-b', '--batch-size', default=4, type=int, metavar='N',
                     help='mini-batch size (default: 4),only used for train')
-parser.add_argument('--patches', default=100, type=int, metavar='N', 
+parser.add_argument('--patches', default=100, type=int, metavar='N',
                     help='number of patches per image')
-parser.add_argument('--dataset', default="parta", type=str, 
+parser.add_argument('--dataset', default="parta", type=str,
                      help='dataset to train on')
-parser.add_argument('--lr', '--learning-rate', default=1e-3, type=float, 
+parser.add_argument('--lr', '--learning-rate', default=1e-3, type=float,
                     metavar='LR', help='initial learning rate')
 parser.add_argument('--momentum', default=0.9, type=float,
                      metavar='M', help='momentum')
@@ -107,11 +107,11 @@ class networkFunctions():
 
     '''
         Get N channel ground truth for each scale. (Here N = 4 except for WIDERFACE)
-        B1, B2, B3, Z - Bi's are Box GT and Z is the background i.e 
+        B1, B2, B3, Z - Bi's are Box GT and Z is the background i.e
         if there is not GT in any of the scales.
-        
+
         Parameters
-        -----------        
+        -----------
         Yss (list of torch cuda tensor)
         bool_masks (list of torch cuda tensor) - Used only while training
         mode (string) - To specify if the fn. is called at test/train time.
@@ -156,15 +156,15 @@ class networkFunctions():
                 if scale_sel_inds.shape[0] > 0:
                     # find box index in the scale
                     sel_box_inds = box_inds[scale_sel_inds]
-                    scale_box_inds = sel_box_inds % 3 
+                    scale_box_inds = sel_box_inds % 3
                     heads_y = y_idx[scale_sel_inds] // PRED_DOWNSCALE_FACTORS[3-i]
                     heads_x = x_idx[scale_sel_inds] // PRED_DOWNSCALE_FACTORS[3-i]
-                    
+
                     Yss_out[i][b, scale_box_inds, heads_y, heads_x] = BOX_SIZE_BINS_NPY[sel_box_inds]
                     Yss_out[i][b, 3, heads_y, heads_x] = 0
 
             assert(check_sum == torch.sum(Yss[0][b]).item() == len(y_idx))
-            
+
         Yss_out = [torch.cuda.FloatTensor(w_map) for w_map in Yss_out]
         check_sum = 0
         for yss_out in Yss_out:
@@ -187,8 +187,8 @@ class networkFunctions():
 
         Input - input (torch tensor) - A binary map denoting where the head is present. (Bx4xHxW)
                 factor (int) - factor by which you need to upsample
-                
-        Output - output (torch tensor) - Upsampled and non-repeated output (Bx4xH'xW') 
+
+        Output - output (torch tensor) - Upsampled and non-repeated output (Bx4xH'xW')
                  H' - upsampled height
                  W' - upsampled width
 
@@ -197,12 +197,12 @@ class networkFunctions():
         channels = input_.size(1)
         indices = torch.nonzero(input_)
         indices_up = indices.clone()
-        # Corner case! 
+        # Corner case!
         if indices_up.size(0) == 0:
             return torch.zeros(input_.size(0),input_.size(1), input_.size(2)*factor, input_.size(3)*factor).cuda()
         indices_up[:, 2] *= factor
         indices_up[:, 3] *= factor
-        
+
         output = torch.zeros(input_.size(0),input_.size(1), input_.size(2)*factor, input_.size(3)*factor).cuda()
         output[indices_up[:, 0], indices_up[:, 1], indices_up[:, 2], indices_up[:, 3]] = input_[indices[:, 0], indices[:, 1], indices[:, 2], indices[:, 3]]
 
@@ -217,7 +217,7 @@ class networkFunctions():
 
     '''
         This function implements the GWTA loss in which it
-        divides the pred and gt into grids and calculates 
+        divides the pred and gt into grids and calculates
         loss on each grid and returns the maximum of the losses.
 
         input : pred (torch.cuda.FloatTensor) - Bx4xHxW - prediction from the network
@@ -251,32 +251,32 @@ class networkFunctions():
             curr_loss = criterion(out, yss)
             if curr_loss > max_loss:
                 max_loss = curr_loss
-        return max_loss    
-     
+        return max_loss
+
     '''
-        Create network functions i.e train and test functions 
+        Create network functions i.e train and test functions
         for LSC-CNN.
-        
+
         Parameters
         -----------
         network: (torch model)torch model to train.
         Here len(network == 1)
-        
+
         Returns
         ---------
-        train_funcs: list of train function for each of the network in 
+        train_funcs: list of train function for each of the network in
                      network
-        test_funcs: list of test function for each of the network in 
+        test_funcs: list of test function for each of the network in
                      network
     '''
     def create_network_functions(self, network):
         self.optimizers = optim.SGD(filter(lambda p: p.requires_grad, network.parameters()),
                                          lr=args.lr, momentum=args.momentum, weight_decay=args.weight_decay)
-        
+
         '''
             Train function for LSC-CNN, with GWTA Loss
             and scale-wise weighting.
-            
+
             Parameters
             -----------
             Xs - (ndarray) Batched images
@@ -295,19 +295,19 @@ class networkFunctions():
 
             if torch.cuda.is_available():
                 X = torch.autograd.Variable(torch.from_numpy(Xs)).cuda()
-                
+
                 Y = torch.autograd.Variable(torch.FloatTensor(Ys)).cuda()
                 Yss = [Y]
             else:
                 assert(0)
             for s in range(0, 3):
                 Yss.append(torch.nn.functional.avg_pool2d(Yss[s], (2, 2)) * 4)
-            
+
             output_vars = [network(X, None)]
 
 
             outputs_1 = [out for out in output_vars[0]]
-            
+
             Yss_out = self.get_box_gt(Yss) # Making 4 channel ground truth
             Yss = Yss[::-1]        # Reverse GT for uniformity of having lowest scale in the beginning
             Yss_out = Yss_out[::-1]    # Reverse pred for uniformity of having lowest scale in the beginning
@@ -319,7 +319,7 @@ class networkFunctions():
             sums = []
 
             Yss_argmax = [torch.argmax(yss, dim=1) for yss in Yss_out]
-        
+
             alpha1 = torch.cuda.FloatTensor(loss_weights[3])  # 1/16 scale
             alpha2 = torch.cuda.FloatTensor(loss_weights[2])  # 1/8 scale
             alpha3 = torch.cuda.FloatTensor(loss_weights[1])  # 1/4 scale
@@ -329,7 +329,7 @@ class networkFunctions():
             m_2 = nn.CrossEntropyLoss(size_average=True, weight=alpha2)
             m_3 = nn.CrossEntropyLoss(size_average=True, weight=alpha3)
             m_4 = nn.CrossEntropyLoss(size_average=True, weight=alpha4)
-            
+
             loss = 0.0
             '''
                 GWTA Loss
@@ -341,17 +341,17 @@ class networkFunctions():
                     loss_ = m(out, yss)
                 loss += loss_
                 losses.append(loss_.item())
-                
+
             loss.backward()
             self.optimizers.step()
-            
-            # -- Histogram of boxes for weighting -- 
+
+            # -- Histogram of boxes for weighting --
             for out_idx, (out, yss) in enumerate(zip(outputs[::-1], Yss_out[::-1])):
                 out_argmax = torch.argmax(out, dim=1)
                 bin_ = np.bincount(out_argmax.cpu().data.numpy().flatten())
                 ii = np.nonzero(bin_)[0]
                 hist_boxes[ii+4*out_idx] += bin_[ii]
-                
+
                 Yss_argmax = torch.argmax(yss, dim=1)
                 bin_gt = np.bincount(Yss_argmax.cpu().data.numpy().flatten())
                 ii_gt = np.nonzero(bin_gt)[0]
@@ -362,12 +362,12 @@ class networkFunctions():
 
         '''
             Test function for LSC-CNN.
-            
+
             Parameters
             -----------
             X - (np.ndarray) Image patches (Bx3XHxW)
             Y - (np.ndarray) Ground truth in highest scale (BX1XHXW)
-            
+
             Returns
             ---------
             losses: (list of float) list of loss values of each scale.
@@ -388,13 +388,13 @@ class networkFunctions():
                 Yss = [Y]
             else:
                 assert(0)
-            
+
             network = network.cuda()
             output = network(X, None)
 
             for s in range(0, 3):
                 Yss.append(torch.nn.functional.avg_pool2d(Yss[s], (2, 2)) * 4)
-            
+
             assert(torch.sum(Yss[0]) == torch.sum(Yss[1]))
 
             # Making 4 channel ground truth
@@ -435,7 +435,7 @@ class networkFunctions():
                 upsample_pred.append(upsample_out.cpu().data.numpy())
 
             return loss.data, upsample_pred, upsample_gt
-                    
+
 
         self.train_funcs.append(train_function)
         self.test_funcs = test_function
@@ -445,13 +445,13 @@ class networkFunctions():
 '''
     This loads the model for training from ImageNet weights
     initialization for VGG backbone.
-    
+
     Parameters
     -----------
     net: (torch model) network
-    dont_load: (list) list of layers, for which weights 
+    dont_load: (list) list of layers, for which weights
                should not be loaded.
-               
+
     Returns
     ---------
     Returns nothing. The weights are replaced inplace.
@@ -489,7 +489,7 @@ def load_model_VGG16(net, dont_load=[]):
                 print (layer, 'skipped.')
                 continue
             print ("Copying ", layer)
-            
+
             for name, module in net.named_children():
                 if layer == name and (not layer.startswith("conv_middle_")) and (not layer.startswith("conv_lowest_") and (not layer.startswith("conv_scale1_"))):
                     lyr = module
@@ -522,7 +522,7 @@ def load_model_VGG16(net, dont_load=[]):
         max_dist: (int, default=16) maximum distance beyond
                   which there's a penalty
 
-        NOTE: MLE is ALWAYS calculated in 1x scale i.e 
+        NOTE: MLE is ALWAYS calculated in 1x scale i.e
               scale of the input image and hence multiplication
               with "output_downscale"
     Returns
@@ -538,7 +538,7 @@ def get_offset_error(x_pred, y_pred, x_true, y_true, output_downscale, max_dist=
     m = len(x_pred)
     if m == 0 or n == 0:
         return 0
-        
+
     x_true *= output_downscale
     y_true *= output_downscale
     x_pred *= output_downscale
@@ -562,7 +562,7 @@ def get_offset_error(x_pred, y_pred, x_true, y_true, output_downscale, max_dist=
 '''
     Draws bounding box on predictions of LSC-CNN
     Parameters
-    ---------- 
+    ----------
         image: (ndarray:HXWX3) input image
         h_map: (HXW) map denoting height of the box
         w_map: (HXW) map denoting width of the box
@@ -576,6 +576,7 @@ def get_offset_error(x_pred, y_pred, x_true, y_true, output_downscale, max_dist=
 '''
 
 def get_boxed_img(image, h_map, w_map, gt_pred_map, prediction_downscale, thickness=1, multi_colours=False):
+    prediction_downscale = 4;
     if multi_colours:
         colours = [(255, 0, 0), (0, 255, 0), (0, 0, 255), (0, 255, 255)] # colours for [1/8, 1/4, 1/2] scales
 
@@ -605,10 +606,10 @@ def get_boxed_img(image, h_map, w_map, gt_pred_map, prediction_downscale, thickn
     return boxed_img.transpose((2, 0, 1))
 
 '''
-    Testing function for LSC-CNN. 
+    Testing function for LSC-CNN.
     Parameters
     -----------
-        test_funcs: (python function) function to test the images 
+        test_funcs: (python function) function to test the images
                     (returns 4 channel output [b_1, b_2, b_3, z] for gt and prediction)
         dataset: (Object) DataReader Object
         set_name: (string) sets the name for dataset to test on - either test or train
@@ -628,7 +629,7 @@ def test_lsccnn(test_funcs, dataset, set_name, network, print_output=False, thre
     metrics_ = ['new_mae', 'mle', 'mse', 'loss1']
     for k in metrics_:
         metrics_test[k] = 0.0
-    
+
     global loss_weights
     if loss_weights is None:
         loss_weights = np.ones((len(PRED_DOWNSCALE_FACTORS), NUM_BOXES_PER_SCALE+1))
@@ -669,7 +670,7 @@ def test_lsccnn(test_funcs, dataset, set_name, network, print_output=False, thre
 
         # -- Calculate metrics
         metrics_test = calculate_metrics(pred_dot_map, e_iter[2], metrics_test)
-        
+
     for m in metrics_:
         metrics_test[m] /= float(e_idx+1)
     metrics_test['mse'] = np.sqrt(metrics_test['mse'])
@@ -686,10 +687,10 @@ def test_lsccnn(test_funcs, dataset, set_name, network, print_output=False, thre
     This function calculates the various counting and localization metrics
 
     Parameters
-    ---------- 
+    ----------
         pred: dot map prediction of LSC-CNN (HxW)
         true: ground truth map (HxW)
-        metrics_test: dictionary of metrics 
+        metrics_test: dictionary of metrics
     Returns
     ----------
         metrics_test: updated dictionary of metrics
@@ -715,7 +716,7 @@ def calculate_metrics(pred, true, metrics_test):
     This function finds the optimal threshold on the validation set.
 
     Parameters
-    ---------- 
+    ----------
         f: (file object) file writer
         iters: Number of iterations to run the binary search
         test_funcs: lsccnn test function
@@ -724,7 +725,7 @@ def calculate_metrics(pred, true, metrics_test):
         end: ending threshold
     Returns
     ----------
-        optimal_threshold: optimal threshold where the mae is 
+        optimal_threshold: optimal threshold where the mae is
                            lowest on validation set.
 '''
 
@@ -749,9 +750,9 @@ def find_class_threshold(f, dataset, iters, test_funcs, network, splits=10, beg=
     This function performs box NMS on the predictions of the net.
 
     Parameters
-    ---------- 
+    ----------
         predictions: multiscale predictions - list of numpy maps
-                     each map is of size 4 x H x W 
+                     each map is of size 4 x H x W
     Returns
     ----------
         nms_out: Binary map of where the prediction person is
@@ -767,26 +768,26 @@ def box_NMS(predictions, thresh):
         # index the boxes with BOXES to get h_map and w_map (both are the same for us)
         mask = (boxes<3) # removing Z
         boxes = (boxes+1) * mask
-        scores = (scores * mask) # + 100 # added 100 since we take logsoftmax and it's negative!! 
-    
+        scores = (scores * mask) # + 100 # added 100 since we take logsoftmax and it's negative!!
+
         boxes = (boxes==1)*BOXES[k][0] + (boxes==2)*BOXES[k][1] + (boxes==3)*BOXES[k][2]
         Scores.append(scores)
         Boxes.append(boxes)
 
     x, y, h, w, scores = apply_nms.apply_nms(Scores, Boxes, Boxes, 0.5, thresh=thresh)
-    
+
     nms_out = np.zeros((predictions[0].shape[1], predictions[0].shape[2])) # since predictions[0] is of size 4 x H x W
     box_out = np.zeros((predictions[0].shape[1], predictions[0].shape[2])) # since predictions[0] is of size 4 x H x W
     for (xx, yy, hh) in zip(x, y, h):
         nms_out[yy, xx] = 1
         box_out[yy, xx] = hh
-    
+
     assert(np.count_nonzero(nms_out) == len(x))
 
     return nms_out, box_out
 
 """
-    A function to return dotmaps and box maps of either gt 
+    A function to return dotmaps and box maps of either gt
     or predictions. In case of predictions, it would be NMSed
     output and in case of gt maps, it would be would be from each
     individual scale.
@@ -811,19 +812,19 @@ def get_box_and_dot_maps(pred, thresh):
     nms_out, h = box_NMS(pred, thresh)
     return nms_out, h
 
-    
+
 '''
     Main training code for LSC-CNN.
     Parameters
     -----------
     network : (torch model) network. In this case len(network) == 1
     dataset: (class object) data_reader class object
-    network_function: (class) network_functions() class object to get test and train 
-                      functions. 
+    network_function: (class) network_functions() class object to get test and train
+                      functions.
     log_path: (str) path to log losses and stats.
     Returns
     ----------
-    This method does not return anything. It directly logs all the losses, 
+    This method does not return anything. It directly logs all the losses,
     metrics and statistics of training/validation/testing stages.
 '''
 
@@ -870,10 +871,10 @@ def train_networks(network, dataset, network_functions, log_path):
             test_losses[metric] = test_losses[metric][:start_epoch]
         for metric in train_losses.keys():
             train_losses[metric] = train_losses[metric][:start_epoch]
-        
+
         network, _= load_net(network,
                              network_functions, 0,
-                             snapshot_path, 
+                             snapshot_path,
                              get_filename(\
                              network.name,
                              start_epoch))
@@ -889,7 +890,7 @@ def train_networks(network, dataset, network_functions, log_path):
         avg_loss = [0.0 for _ in range(1)]
         hist_boxes = np.zeros((16,))
         hist_boxes_gt = np.zeros((16,))
-        
+
         # b_i - batch index
         for b_i in range(num_batches_per_epoch):
             # Generate next training sample
@@ -899,7 +900,7 @@ def train_networks(network, dataset, network_functions, log_path):
 
             for scale_idx in range(1):
                 avg_loss[scale_idx] = avg_loss[scale_idx] + losses[scale_idx]
-            
+
             # Logging losses after 1k iterations.
             if b_i % 1000 == 0:
                 log(f, 'Epoch %d [%d]: %s loss: %s.' % (epoch, b_i, [network.name], losses))
@@ -922,7 +923,7 @@ def train_networks(network, dataset, network_functions, log_path):
         avg_loss = [av for av in avg_loss]
 
         train_losses['loss1'].append(avg_loss)
-        
+
         epoch_test_losses, txt = test_lsccnn(test_funcs, dataset, 'test', network, True)
         log(f, 'TEST epoch: ' + str(epoch) + ' ' + txt)
         epoch_val_losses, txt = test_lsccnn(test_funcs, dataset, 'test_valid', network, True)
@@ -956,7 +957,7 @@ def train_networks(network, dataset, network_functions, log_path):
                 plt.savefig(os.path.join(snapshot_path, 'train_%s.png' % metric))
                 plt.clf()
                 plt.close()
-        
+
         for metric in valid_losses.keys():
             if isinstance(valid_losses[metric][0], list):
                 for i in range(len(valid_losses[metric][0])):
@@ -968,7 +969,7 @@ def train_networks(network, dataset, network_functions, log_path):
             plt.savefig(os.path.join(snapshot_path, 'valid_%s.png' % metric))
             plt.clf()
             plt.close()
-        
+
         for metric in test_losses.keys():
             if isinstance(test_losses[metric][0], list):
                 for i in range(len(test_losses[metric][0])):
@@ -1019,7 +1020,7 @@ def train():
         else:
             image_scale_factor = 1
         dataset.create_dataset_files(dataset_paths,
-                                     image_crop_size=crop_size, 
+                                     image_crop_size=crop_size,
                                      image_roi_size=80,
                                      image_roi_stride=72,
                                      image_scale_factor=image_scale_factor,
@@ -1043,16 +1044,16 @@ def train():
         os.makedirs(model_save_path)
         os.makedirs(os.path.join(model_save_path, 'snapshots'))
 
-    train_networks(network=network, 
-                   dataset=dataset, 
+    train_networks(network=network,
+                   dataset=dataset,
                    network_functions=networkFunctions(),
                    log_path=model_save_path)
 
     print('\n-------\nDONE.')
 
 if __name__ == '__main__':
-    args = parser.parse_args()    
-    # -- Assign GPU    
+    args = parser.parse_args()
+    # -- Assign GPU
     os.environ["CUDA_VISIBLE_DEVICES"] = str(args.gpu)
 
     # -- Assertions
@@ -1070,7 +1071,7 @@ if __name__ == '__main__':
     torch.cuda.manual_seed_all(11)
 
     # -- Dataset paths
-    if args.dataset == "parta":    
+    if args.dataset == "parta":
         dataset_paths = {'test': ['../dataset/ST_partA/test_data/images',
                                '../dataset/ST_partA/test_data/ground_truth'],
                          'train': ['../dataset/ST_partA/train_data/images',
@@ -1097,13 +1098,12 @@ if __name__ == '__main__':
         output_downscale = 2
         path = '../dataset/qnrf_dotmaps_predictionScale_'+str(output_downscale)
 
-    
+
     model_save_dir = './models'
 
     batch_size = args.batch_size
     crop_size = 224
-    dataset = DataReader(path)
-    
+    dataset = DataReader(path, args.dataset)
+
     # -- Train the model
     train()
-
